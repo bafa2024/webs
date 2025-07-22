@@ -1,0 +1,17 @@
+I need assistance in saving HTML pages from a website. The project involves saving 1000s of pages along with all associated assets, including images, CSS, and JavaScript. The saved pages must be organized in specific folders as per my requirements. A simple Cntl-S and the addition of a filepath in front of the saved filename dialog would work. I need the ability to either provide a spreadsheet with a list of links or an api interface that specifies a specific link and save location.
+
+Key Requirements:
+- Save 1000's of HTML pages.
+- Include all assets: images, CSS, and JavaScript.
+- Organize saved pages in specific folders or as described above.
+
+Ideal Skills and Experience:
+- Proficiency in web scraping and data extraction.
+- Experience in handling and organizing large volumes of web data.
+- Knowledge of HTML, CSS, and JavaScript.
+- Ability to structure data in specified formats.
+Skills Required
+Web Scraping
+HTML
+API Development
+Data Management

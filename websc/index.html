@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Scraper Pro Dashboard</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+        const { 
+            Play, 
+            Pause, 
+            Download, 
+            Upload, 
+            Settings, 
+            AlertCircle, 
+            CheckCircle, 
+            Clock, 
+            FileText,
+            Database,
+            Globe,
+            FolderOpen,
+            Plus,
+            X,
+            BarChart3,
+            Zap,
+            Shield,
+            Trash2,
+            Edit,
+            Eye,
+            RefreshCw
+        } = lucide;
+
+        const WebScraperDashboard = () => {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [jobs, setJobs] = useState([
+                {
+                    id: 1,
+                    name: 'E-commerce Product Pages',
+                    status: 'running',
+                    progress: 65,
+                    totalPages: 1500,
+                    completedPages: 975,
+                    failedPages: 12,
+                    createdAt: '2025-07-19T10:30:00Z',
+                    description: 'Scraping product information from major e-commerce sites'
+                },
+                {
+                    id: 2,
+                    name: 'News Articles Backup',
+                    status: 'completed',
+                    progress: 100,
+                    totalPages: 2300,
+                    completedPages: 2285,
+                    failedPages: 15,
+                    createdAt: '2025-07-18T14:20:00Z',
+                    description: 'Backing up news articles from various sources'
+                },
+                {
+                    id: 3,
+                    name: 'Real Estate Listings',
+                    status: 'failed',
+                    progress: 23,
+                    totalPages: 800,
+                    completedPages: 184,
+                    failedPages: 45,
+                    createdAt: '2025-07-17T09:15:00Z',
+                    description: 'Collecting real estate listings data'
+                }
+            ]);
+
+            const [newJobData, setNewJobData] = useState({
+                name: '',
+                urls: '',
+                outputPath: '',
+                delay: 2,
+                useProxy: true,
+                assetTypes: ['css', 'js', 'images'],
+                description: ''
+            });
+
+            const [showDeleteModal, setShowDeleteModal] = useState(false);
+            const [jobToDelete, setJobToDelete] = useState(null);
+            const [isLoading, setIsLoading] = useState(false);
+            const [notification, setNotification] = useState(null);
+
+            const fileInputRef = useRef(null);
+
+            // Auto-update running jobs progress
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setJobs(prevJobs => 
+                        prevJobs.map(job => {
+                            if (job.status === 'running' && job.progress < 100) {
+                                const newProgress = Math.min(job.progress + Math.random() * 2, 100);
+                                const newCompleted = Math.floor((newProgress / 100) * job.totalPages);
+                                
+                                if (newProgress >= 100) {
+                                    return {
+                                        ...job,
+                                        status: 'completed',
+                                        progress: 100,
+                                        completedPages: job.totalPages
+                                    };
+                                }
+                                
+                                return {
+                                    ...job,
+                                    progress: newProgress,
+                                    completedPages: newCompleted
+                                };
+                            }
+                            return job;
+                        })
+                    );
+                }, 3000);
+
+                return () => clearInterval(interval);
+            }, []);
+
+            const getStatusIcon = (status) => {
+                switch (status) {
+                    case 'running': return <Clock className="w-4 h-4 text-blue-500" />;
+                    case 'completed': return <CheckCircle className="w-4 h-4 text-green-500" />;
+                    case 'failed': return <AlertCircle className="w-4 h-4 text-red-500" />;
+                    case 'paused': return <Pause className="w-4 h-4 text-yellow-500" />;
+                    default: return <Clock className="w-4 h-4 text-gray-500" />;
+                }
+            };
+
+            const getStatusColor = (status) => {
+                switch (status) {
+                    case 'running': return 'text-blue-600 bg-blue-50';
+                    case 'completed': return 'text-green-600 bg-green-50';
+                    case 'failed': return 'text-red-600 bg-red-50';
+                    case 'paused': return 'text-yellow-600 bg-yellow-50';
+                    default: return 'text-gray-600 bg-gray-50';
+                }
+            };
+
+            const handleFileUpload = (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const content = e.target.result;
+                        setNewJobData(prev => ({ ...prev, urls: content }));
+                        showNotification('File uploaded successfully!', 'success');
+                    };
+                    reader.readAsText(file);
+                }
+            };
+
+            const createNewJob = () => {
+                if (!newJobData.name.trim() || !newJobData.urls.trim()) {
+                    showNotification('Please fill in all required fields', 'error');
+                    return;
+                }
+
+                setIsLoading(true);
+                
+                // Simulate API call
+                setTimeout(() => {
+                    const newJob = {
+                        id: Date.now(),
+                        name: newJobData.name,
+                        status: 'pending',
+                        progress: 0,
+                        totalPages: newJobData.urls.split('\n').filter(url => url.trim()).length,
+                        completedPages: 0,
+                        failedPages: 0,
+                        createdAt: new Date().toISOString(),
+                        description: newJobData.description
+                    };
+                    
+                    setJobs(prev => [newJob, ...prev]);
+                    setNewJobData({
+                        name: '',
+                        urls: '',
+                        outputPath: '',
+                        delay: 2,
+                        useProxy: true,
+                        assetTypes: ['css', 'js', 'images'],
+                        description: ''
+                    });
+                    setActiveTab('dashboard');
+                    setIsLoading(false);
+                    showNotification('Job created successfully!', 'success');
+                }, 1000);
+            };
+
+            const toggleJobStatus = (jobId) => {
+                setJobs(prevJobs => 
+                    prevJobs.map(job => {
+                        if (job.id === jobId) {
+                            if (job.status === 'running') {
+                                return { ...job, status: 'paused' };
+                            } else if (job.status === 'paused') {
+                                return { ...job, status: 'running' };
+                            }
+                        }
+                        return job;
+                    })
+                );
+            };
+
+            const deleteJob = (jobId) => {
+                setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
+                setShowDeleteModal(false);
+                setJobToDelete(null);
+                showNotification('Job deleted successfully', 'success');
+            };
+
+            const showNotification = (message, type = 'info') => {
+                setNotification({ message, type });
+                setTimeout(() => setNotification(null), 3000);
+            };
+
+            const getTotalStats = () => {
+                const totalPages = jobs.reduce((sum, job) => sum + job.completedPages, 0);
+                const totalFailed = jobs.reduce((sum, job) => sum + job.failedPages, 0);
+                const successRate = totalPages > 0 ? ((totalPages - totalFailed) / totalPages * 100).toFixed(1) : 0;
+                const activeJobs = jobs.filter(job => job.status === 'running').length;
+                
+                return { totalPages, successRate, activeJobs };
+            };
+
+            const stats = getTotalStats();
+
+            const renderDashboard = () => (
+                <div className="space-y-6 fade-in">
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-blue-100 text-sm font-medium">Total Jobs</p>
+                                    <p className="text-3xl font-bold">{jobs.length}</p>
+                                </div>
+                                <BarChart3 className="w-8 h-8 text-blue-200" />
+                            </div>
+                        </div>
+                        
+                        <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-green-100 text-sm font-medium">Pages Scraped</p>
+                                    <p className="text-3xl font-bold">{stats.totalPages.toLocaleString()}</p>
+                                </div>
+                                <Globe className="w-8 h-8 text-green-200" />
+                            </div>
+                        </div>
+                        
+                        <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-purple-100 text-sm font-medium">Success Rate</p>
+                                    <p className="text-3xl font-bold">{stats.successRate}%</p>
+                                </div>
+                                <Shield className="w-8 h-8 text-purple-200" />
+                            </div>
+                        </div>
+                        
+                        <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-orange-100 text-sm font-medium">Active Jobs</p>
+                                    <p className="text-3xl font-bold">{stats.activeJobs}</p>
+                                </div>
+                                <Zap className="w-8 h-8 text-orange-200" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Jobs List */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+                        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                            <h2 className="text-lg font-semibold text-gray-900">Recent Jobs</h2>
+                            <button 
+                                onClick={() => setActiveTab('new-job')}
+                                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                title="Create new job"
+                            >
+                                <Plus className="w-4 h-4" />
+                                <span>New Job</span>
+                            </button>
+                        </div>
+                        <div className="divide-y divide-gray-200">
+                            {jobs.length === 0 ? (
+                                <div className="p-12 text-center">
+                                    <Database className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                                    <h3 className="text-lg font-medium text-gray-900 mb-2">No jobs yet</h3>
+                                    <p className="text-gray-600 mb-4">Create your first scraping job to get started</p>
+                                    <button 
+                                        onClick={() => setActiveTab('new-job')}
+                                        className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 mx-auto"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        <span>Create First Job</span>
+                                    </button>
+                                </div>
+                            ) : (
+                                jobs.map((job) => (
+                                    <div key={job.id} className="p-6 hover:bg-gray-50 transition-colors slide-in">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center space-x-3">
+                                                {getStatusIcon(job.status)}
+                                                <div>
+                                                    <h3 className="font-medium text-gray-900">{job.name}</h3>
+                                                    {job.description && (
+                                                        <p className="text-sm text-gray-500">{job.description}</p>
+                                                    )}
+                                                </div>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(job.status)}`}>
+                                                    {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                                                </span>
+                                            </div>
+                                            <div className="flex space-x-2">
+                                                {job.status === 'running' && (
+                                                    <button 
+                                                        onClick={() => toggleJobStatus(job.id)}
+                                                        className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                                                        title="Pause job"
+                                                    >
+                                                        <Pause className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                {job.status === 'paused' && (
+                                                    <button 
+                                                        onClick={() => toggleJobStatus(job.id)}
+                                                        className="p-2 text-blue-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition-colors"
+                                                        title="Resume job"
+                                                    >
+                                                        <Play className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                <button 
+                                                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                                                    title="View job details"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                </button>
+                                                <button 
+                                                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                                                    title="Edit job"
+                                                >
+                                                    <Edit className="w-4 h-4" />
+                                                </button>
+                                                <button 
+                                                    onClick={() => {
+                                                        setJobToDelete(job);
+                                                        setShowDeleteModal(true);
+                                                    }}
+                                                    className="p-2 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                                                    title="Delete job"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-sm text-gray-600">
+                                                <span>{job.completedPages} of {job.totalPages} pages</span>
+                                                <span>{job.progress}%</span>
+                                            </div>
+                                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                                <div 
+                                                    className={`h-2 rounded-full transition-all duration-300 progress-bar ${
+                                                        job.status === 'completed' ? 'bg-green-500' :
+                                                        job.status === 'failed' ? 'bg-red-500' :
+                                                        'bg-gradient-to-r from-blue-500 to-blue-600'
+                                                    }`}
+                                                    style={{ width: `${job.progress}%` }}
+                                                ></div>
+                                            </div>
+                                            <div className="flex justify-between text-xs text-gray-500">
+                                                <span>Started: {new Date(job.createdAt).toLocaleDateString()}</span>
+                                                <span>{job.failedPages} failed</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const renderNewJob = () => (
+                <div className="max-w-2xl mx-auto fade-in">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div className="mb-6">
+                            <h2 className="text-xl font-semibold text-gray-900">Create New Scraping Job</h2>
+                            <p className="text-gray-600 mt-1">Configure your web scraping parameters</p>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div>
+                                <label htmlFor="jobName" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Job Name *
+                                </label>
+                                <input
+                                    id="jobName"
+                                    type="text"
+                                    value={newJobData.name}
+                                    onChange={(e) => setNewJobData({...newJobData, name: e.target.value})}
+                                    placeholder="Enter job name..."
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="jobDescription" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Description
+                                </label>
+                                <input
+                                    id="jobDescription"
+                                    type="text"
+                                    value={newJobData.description}
+                                    onChange={(e) => setNewJobData({...newJobData, description: e.target.value})}
+                                    placeholder="Brief description of the job..."
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="urls" className="block text-sm font-medium text-gray-700 mb-2">
+                                    URLs to Scrape *
+                                </label>
+                                <textarea
+                                    id="urls"
+                                    value={newJobData.urls}
+                                    onChange={(e) => setNewJobData({...newJobData, urls: e.target.value})}
+                                    placeholder="Enter URLs (one per line)..."
+                                    rows={6}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    required
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Or upload a spreadsheet with URLs</p>
+                            </div>
+
+                            <div className="flex space-x-4">
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    type="button"
+                                    className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                                >
+                                    <Upload className="w-4 h-4" />
+                                    <span>Upload CSV/Excel</span>
+                                </button>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".csv,.xlsx,.xls,.txt"
+                                    onChange={handleFileUpload}
+                                    className="hidden"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="outputPath" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Output Directory
+                                </label>
+                                <div className="flex items-center space-x-2">
+                                    <FolderOpen className="w-5 h-5 text-gray-400" />
+                                    <input
+                                        id="outputPath"
+                                        type="text"
+                                        value={newJobData.outputPath}
+                                        onChange={(e) => setNewJobData({...newJobData, outputPath: e.target.value})}
+                                        placeholder="/path/to/output/directory"
+                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="delay" className="block text-sm font-medium text-gray-700 mb-2">
+                                        Delay Between Requests (seconds)
+                                    </label>
+                                    <input
+                                        id="delay"
+                                        type="number"
+                                        value={newJobData.delay}
+                                        onChange={(e) => setNewJobData({...newJobData, delay: parseInt(e.target.value) || 1})}
+                                        min="1"
+                                        max="60"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Bot Bypass Settings
+                                    </label>
+                                    <div className="flex items-center space-x-2">
+                                        <input
+                                            type="checkbox"
+                                            id="useProxy"
+                                            checked={newJobData.useProxy}
+                                            onChange={(e) => setNewJobData({...newJobData, useProxy: e.target.checked})}
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <label htmlFor="useProxy" className="text-sm text-gray-700">Use Proxy Pool</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Asset Types to Include
+                                </label>
+                                <div className="space-y-2">
+                                    {['css', 'js', 'images', 'fonts'].map((type) => (
+                                        <div key={type} className="flex items-center space-x-2">
+                                            <input
+                                                type="checkbox"
+                                                id={type}
+                                                checked={newJobData.assetTypes.includes(type)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setNewJobData({...newJobData, assetTypes: [...newJobData.assetTypes, type]});
+                                                    } else {
+                                                        setNewJobData({...newJobData, assetTypes: newJobData.assetTypes.filter(t => t !== type)});
+                                                    }
+                                                }}
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <label htmlFor={type} className="text-sm text-gray-700 capitalize">{type}</label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex space-x-3 pt-4">
+                                <button
+                                    onClick={createNewJob}
+                                    disabled={isLoading}
+                                    className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    {isLoading ? (
+                                        <RefreshCw className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <Play className="w-4 h-4" />
+                                    )}
+                                    <span>{isLoading ? 'Creating...' : 'Create & Start Job'}</span>
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('dashboard')}
+                                    type="button"
+                                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const renderSettings = () => (
+                <div className="max-w-4xl mx-auto fade-in">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div className="mb-6">
+                            <h2 className="text-xl font-semibold text-gray-900">Global Settings</h2>
+                            <p className="text-gray-600 mt-1">Configure default scraping parameters and system preferences</p>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <h3 className="text-lg font-medium text-gray-900 mb-4">Scraping Configuration</h3>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Default Request Delay (seconds)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                defaultValue="2"
+                                                min="1"
+                                                max="60"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Max Concurrent Requests
+                                            </label>
+                                            <input
+                                                type="number"
+                                                defaultValue="5"
+                                                min="1"
+                                                max="20"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Request Timeout (seconds)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                defaultValue="30"
+                                                min="5"
+                                                max="300"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="text-lg font-medium text-gray-900 mb-4">Bot Bypass Settings</h3>
+                                    <div className="space-y-4">
+                                        <div className="flex items-center space-x-2">
+                                            <input
+                                                type="checkbox"
+                                                id="defaultProxy"
+                                                defaultChecked
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <label htmlFor="defaultProxy" className="text-sm text-gray-700">Enable Proxy Pool by Default</label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <input
+                                                type="checkbox"
+                                                id="rotateUserAgent"
+                                                defaultChecked
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <label htmlFor="rotateUserAgent" className="text-sm text-gray-700">Rotate User Agents</label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <input
+                                                type="checkbox"
+                                                id="respectRobots"
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <label htmlFor="respectRobots" className="text-sm text-gray-700">Respect robots.txt</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-6 border-t border-gray-200">
+                                <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                    Save Settings
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    {/* Header */}
+                    <div className="bg-white shadow-sm border-b border-gray-200">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div className="flex justify-between items-center h-16">
+                                <div className="flex items-center space-x-4">
+                                    <Database className="w-8 h-8 text-blue-600" />
+                                    <h1 className="text-xl font-semibold text-gray-900">Web Scraper Pro</h1>
+                                </div>
+                                <div className="flex items-center space-x-4">
+                                    <button 
+                                        onClick={() => setActiveTab('new-job')}
+                                        className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                        title="Create new job"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        <span>New Job</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Navigation */}
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                        <nav className="flex space-x-8">
+                            <button
+                                onClick={() => setActiveTab('dashboard')}
+                                className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                                    activeTab === 'dashboard'
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                            >
+                                Dashboard
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('new-job')}
+                                className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                                    activeTab === 'new-job'
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                            >
+                                New Job
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('settings')}
+                                className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                                    activeTab === 'settings'
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                            >
+                                Settings
+                            </button>
+                        </nav>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+                        {activeTab === 'dashboard' && renderDashboard()}
+                        {activeTab === 'new-job' && renderNewJob()}
+                        {activeTab === 'settings' && renderSettings()}
+                    </div>
+
+                    {/* Notification */}
+                    {notification && (
+                        <div className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 fade-in ${
+                            notification.type === 'success' ? 'bg-green-500 text-white' :
+                            notification.type === 'error' ? 'bg-red-500 text-white' :
+                            'bg-blue-500 text-white'
+                        }`}>
+                            {notification.message}
+                        </div>
+                    )}
+
+                    {/* Delete Confirmation Modal */}
+                    {showDeleteModal && jobToDelete && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Delete Job</h3>
+                                <p className="text-gray-600 mb-6">
+                                    Are you sure you want to delete "{jobToDelete.name}"? This action cannot be undone.
+                                </p>
+                                <div className="flex space-x-3">
+                                    <button
+                                        onClick={() => deleteJob(jobToDelete.id)}
+                                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                    >
+                                        Delete
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowDeleteModal(false);
+                                            setJobToDelete(null);
+                                        }}
+                                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // Render the app
+        ReactDOM.render(<WebScraperDashboard />, document.getElementById('root'));
+    </script>
+</body>
+</html>
